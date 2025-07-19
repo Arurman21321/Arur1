@@ -1,52 +1,3 @@
-local debug = debug
-
--- Global helper: prints error + full stack
-local function traceErr(err)
-    warn(("🔴 [Async Error] %s\n%s"):format(
-        tostring(err),
-        debug.traceback("", 2)
-    ))
-end
-
--- Wrap any function so it's pcall’d and traced
-local function wrap(fn)
-    return function(...)
-        local ok, err = pcall(fn, ...)
-        if not ok then
-            traceErr(err)
-        end
-    end
-end
-
--- Monkey‑patch task.spawn so all your spawned loops are wrapped
-do
-    local realSpawn = task.spawn
-    task.spawn = function(fn, ...)
-        return realSpawn(wrap(fn), ...)
-    end
-end
-
--- Monkey‑patch Event:Connect so all callbacks are wrapped
-do
-    local mt = getrawmetatable(game)
-    setreadonly(mt, false)
-    local oldNamecall = mt.__namecall
-    mt.__namecall = function(self, ...)
-        local method = getnamecallmethod()
-        local args = {...}
-
-        if method == "Connect" and typeof(self) == "RBXScriptSignal" then
-            local callback = args[1]
-            if typeof(callback) == "function" then
-                args[1] = wrap(callback)
-            end
-        end
-
-        return oldNamecall(self, unpack(args))
-    end
-    setreadonly(mt, true)
-end
-
 local Players = game:GetService('Players')
 local TweenService = game:GetService('TweenService')
 local Lighting = game:GetService('Lighting')
@@ -633,21 +584,20 @@ end
             return oldNamecall(self, ...)
         end
 
-local function fireDeviceEvent(arg)
-    local success, err = pcall(function()
-        local args = { arg }
-        game:GetService('ReplicatedStorage')
-            :WaitForChild('Remotes')
-            :WaitForChild('deviceEvent')
-            :FireServer(unpack(args))
-    end)
+        local function fireDeviceEvent(arg)
+            local success, err = pcall(function()
+                local args = { arg }
+                game
+                    :GetService('ReplicatedStorage')
+                    :WaitForChild('Remotes')
+                    :WaitForChild('deviceEvent')
+                    :FireServer(unpack(args))
+            end)
 
-    if not success then
-        warn('Failed to send deviceEvent:', err)
-    end
-end
-
-print("DEBUG: fireDeviceEvent declared as", typeof(fireDeviceEvent))
+            if not success then
+                warn('Failed to send deviceEvent:', err)
+            end
+        end
 
         local function findClosest()
             local myRoot = plr.Character
@@ -937,11 +887,9 @@ local DeviceChangerDropdown = MiscSection:AddDropdown("DeviceChangerDropdown", {
     Default = isMobile and 1 or 2,
     Text = "Device Changer",
     Callback = function(selected)
-        print("DEBUG before fireDeviceEvent call:", typeof(fireDeviceEvent))
         fireDeviceEvent(selected)
     end
 })
-
 
 local ControllerToggle = MiscSection:AddToggle("ControllerToggle", {
     Text = "Controller",
