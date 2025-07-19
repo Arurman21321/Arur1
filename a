@@ -1,0 +1,1851 @@
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+        local Players = game:GetService('Players')
+        local StarterGui = game:GetService('StarterGui')
+        local VirtualInputManager = game:GetService('VirtualInputManager')
+        local RunService = game:GetService('RunService')
+
+        local plr = Players.LocalPlayer
+        local cam = workspace.CurrentCamera
+
+        local TweenService = game:GetService('TweenService')
+        local Players = game:GetService('Players')
+        local player = Players.LocalPlayer
+        local playerGui = player:WaitForChild('PlayerGui')
+        local vs = cam.ViewportSize
+        local clickX = vs.X / 2
+        local clickY = vs.Y / 2
+        local UserInputService = game:GetService('UserInputService')
+        local mobileGui
+        local mobileBtn
+        local screenGui = Instance.new('ScreenGui', plr.PlayerGui)
+        screenGui.Name = 'RangeIndicatorUI'
+
+        local notificationGui = Instance.new('ScreenGui')
+        notificationGui.Name = 'NotificationGui'
+        notificationGui.Parent = plr:WaitForChild('PlayerGui')
+        notificationGui.ResetOnSpawn = false
+
+        local notifications = {}
+
+        local function SendNotification(message, time, color)
+            time = time or 5
+            color = color or Color3.fromRGB(0, 170, 255)
+
+            local notifHolder = Instance.new('Frame')
+            notifHolder.BackgroundTransparency = 1
+            notifHolder.Size = UDim2.new(0, 300, 0, 30)
+            notifHolder.Position = UDim2.new(
+                1,
+                -310,
+                1,
+                -75 - (#notifications * 35)
+            ) -- bottom right offset
+            notifHolder.AnchorPoint = Vector2.new(0, 0)
+            notifHolder.Parent = notificationGui
+            notifHolder.ZIndex = 1400
+
+            local background = Instance.new('Frame')
+            background.Size = UDim2.new(1, 0, 1, 0)
+            background.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+            background.Parent = notifHolder
+            background.ZIndex = 1400
+
+            local accentBar = Instance.new('Frame')
+            accentBar.Size = UDim2.new(0, 5, 1, 0)
+            accentBar.BackgroundColor3 = color
+            accentBar.Parent = background
+            accentBar.ZIndex = 1401
+
+            local textLabel = Instance.new('TextLabel')
+            textLabel.Size = UDim2.new(1, -10, 1, 0)
+            textLabel.Position = UDim2.new(0, 10, 0, 0)
+            textLabel.BackgroundTransparency = 1
+            textLabel.TextColor3 = Color3.new(1, 1, 1)
+            textLabel.TextStrokeTransparency = 0
+            textLabel.Text = message
+            textLabel.Font = Enum.Font.SourceSansBold
+            textLabel.TextSize = 18
+            textLabel.TextXAlignment = Enum.TextXAlignment.Left
+            textLabel.Parent = background
+            textLabel.ZIndex = 1402
+
+            local tweenIn =
+                TweenService:Create(
+                    notifHolder,
+                    TweenInfo.new(0.2),
+                    {
+                        Position = UDim2.new(
+                            1,
+                            -310,
+                            1,
+                            -75 - (#notifications * 35)
+                        ),
+                    }
+                )
+            tweenIn:Play()
+
+            table.insert(notifications, notifHolder)
+
+            local function removeNotification()
+                local tweenOut = TweenService:Create(
+                    notifHolder,
+                    TweenInfo.new(0.25),
+                    {
+                        Position = UDim2.new(
+                            1,
+                            310,
+                            1,
+                            notifHolder.Position.Y.Offset
+                        ),
+                    }
+                )
+                tweenOut:Play()
+                tweenOut.Completed:Wait()
+                notifHolder:Destroy()
+
+                for i, v in ipairs(notifications) do
+                    if v == notifHolder then
+                        table.remove(notifications, i)
+                        break
+                    end
+                end
+
+                for i, notif in ipairs(notifications) do
+                    TweenService
+                        :Create(notif, TweenInfo.new(0.15), {
+                            Position = UDim2.new(
+                                1,
+                                -310,
+                                1,
+                                -75 - ((i - 1) * 35)
+                            ),
+                        })
+                        :Play()
+                end
+            end
+
+            task.delay(time, removeNotification)
+        end
+
+        -- Replace all calls to old notify with SendNotification:
+
+        local function notify(text)
+            SendNotification(text, 3, Color3.fromRGB(0, 170, 255))
+        end
+
+        -- Create window & tabs
+local Window = Library:CreateWindow({
+    Title = "ArurHub",
+    Footer = "v1.0.0",
+    ToggleKeybind = Enum.KeyCode.RightControl,
+    Center = true,
+    AutoShow = true
+})
+
+
+Library.ShowToggleFrameInKeybinds = true -- Show toggle state in keybind menu
+
+        local AimbotTab = Window:AddTab("Aimbot", "crosshair")
+        local AimbotSection = AimbotTab:AddLeftGroupbox("Aimbot", "crosshair")
+        local VisualSection = AimbotTab:AddRightGroupbox("Visual", "eye")
+        local PassSection = AimbotTab:AddRightGroupbox("Pass", "dribbble")
+        local PlayerTab = Window:AddTab("Player", "user-round-cog")
+        local PlayerSection = PlayerTab:AddLeftGroupbox("Player", "user-round-cog")
+        local BallSection = PlayerTab:AddRightGroupbox("Ball", "dribbble")
+        local OtherSection = PlayerTab:AddLeftGroupbox("Other", "user-lock")
+        local MiscTab = Window:AddTab("Misc", "layers")
+        local MiscSection = MiscTab:AddLeftGroupbox("Misc", "settings-2")
+        local OOBSection = MiscTab:AddRightGroupbox("OOB", "monitor-cog")
+        local SettingsTab = Window:AddTab("Settings", "settings")
+        local SettingsSection = SettingsTab:AddLeftGroupbox("Settings", "wrench")
+        
+
+
+        -- State
+        local AimbotEnabled = false
+        local AimbotMode = 'Low Arc'
+        local ShowRange = false
+
+        -- Farlocal function notifymingSection: Aimbot toggle + keybind (P)
+        local toggleObj = AimbotSection:AddToggle("AimbotToggle", {
+            Text = 'Enable Aimbot',
+            Flag = 'AimbotToggle',
+            Callback = function(state)
+                AimbotEnabled = state
+                SendNotification(
+                    state and 'Aimbot Enabled' or 'Aimbot Disabled',
+                    3,
+                    state and Color3.fromRGB(0, 255, 0)
+                        or Color3.fromRGB(255, 0, 0)
+                )
+            end,
+        })
+        
+        local Keybind = toggleObj:AddKeyPicker("AimbotKeybind", {
+    Default = "F",
+    Text = "Aimbot Keybind",
+    Mode = "Toggle",
+
+    -- Sets the toggle's value according to the keybind state if Mode is Toggle
+    SyncToggleState = true,
+    Callback = function(Value)
+    end
+})
+
+
+ -- FarmingSection: Dropdown for Low Arc / High Arc
+local AimbotMode = "Low Arc"
+
+local AimbotDropdown = AimbotSection:AddDropdown("MyDropdown", {
+    Values = { "Low Arc", "High Arc" },
+    Default = 1,
+    Multi = false,
+    Text = "Aimbot Mode",
+    Tooltip = "Select Aimbot Mode",
+    Callback = function(Value)
+        AimbotMode = Value
+        notify('Mode set to ' .. Value)
+    end
+})
+
+
+        local rangeLabel = Instance.new('TextLabel', screenGui)
+        rangeLabel.Size = UDim2.new(0, 200, 0, 50)
+        rangeLabel.Position = UDim2.new(0.5, -100, 0.8, 0)
+        rangeLabel.AnchorPoint = Vector2.new(0.5, 1)
+        rangeLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        rangeLabel.BackgroundTransparency = 0.5
+        rangeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        rangeLabel.Font = Enum.Font.SourceSansBold
+        rangeLabel.TextScaled = true
+        rangeLabel.Visible = false
+
+        -- Character and highlight
+        local char = plr.Character or plr.CharacterAdded:Wait()
+        local highlight = Instance.new('Highlight', char)
+        highlight.Adornee = char
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.Enabled = false
+        highlight.FillTransparency = 0.5
+        highlight.OutlineTransparency = 0
+        highlight.FillColor = Color3.fromRGB(255, 0, 0)
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+
+        -- State
+        local ShowRange = false
+        local RangeMode = 'Bottom'
+        local OnlyShowWithAimbot = false
+
+        -- UI Config
+local Toggle = VisualSection:AddToggle("Range Indicator", {
+    Text = 'Range Indicator',
+    Flag = 'Visual_RangeIndicator',
+    Callback = function(state)
+        ShowRange = state
+        rangeLabel.Visible = state
+        highlight.Enabled = false
+    end,
+})
+
+
+
+local Dropdown = VisualSection:AddDropdown("RangeDropdown", {
+    Values = { 'Bottom', 'Top', 'Outline' },
+    Default = 1,
+    Multi = false,
+    Text = 'Range Mode',
+    Callback = function(val)
+        RangeMode = val
+    end,
+})
+
+local Toggle = VisualSection:AddToggle("AimbotRangeIndicator", {
+    Text = 'Show Only If Aimbot Enabled',
+    Flag = 'Visual_OnlyShowIfAimbot',
+    Callback = function(state)
+        OnlyShowWithAimbot = state
+    end,
+})
+
+        -- Cache all rim parts
+        local rimParts = {}
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA('Sound') and obj.Name == 'Swish' then
+                table.insert(rimParts, obj.Parent)
+            end
+        end
+
+        local balls = {}
+        local MagnetEnabled = false
+        local ShotMagEnabled = false
+        local LocalPlayer = Players.LocalPlayer
+        local character = plr.Character or plr.CharacterAdded:Wait()
+        local rootPart = character:WaitForChild('HumanoidRootPart')
+        local humanoid = character:WaitForChild('Humanoid')
+        local normalSize = rootPart.Size
+        local Players = game:GetService('Players')
+        local LocalPlayer = Players.LocalPlayer
+        local playerRoot = nil
+        local RangeIndicatorEnabled = false
+        local Mode = 'Bottom'
+        LocalPlayer.CharacterAdded:Connect(function(character)
+            playerRoot = character:WaitForChild('HumanoidRootPart')
+        end)
+
+local function getNearestRim()
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return nil, math.huge end
+
+    local bestDist, bestRim = math.huge, nil
+
+    for _, rim in ipairs(rimParts) do
+        local skip = false
+
+        if TeamGoalCheckEnabled and TeamSide then
+            local parent = rim.Parent
+            for _, courtName in ipairs(validCourts) do
+                local court = workspace.Courts:FindFirstChild(courtName)
+                if court then
+                    local isMyHoop =
+                        (TeamSide == "Home" and court.HomeHoop == parent) or
+                        (TeamSide == "Away" and court.AwayHoop == parent)
+
+                    if isMyHoop then
+                        skip = true
+                        break
+                    end
+                end
+            end
+        end
+
+        if not skip then
+            local d = (rim.Position - root.Position).Magnitude
+            if d < bestDist then
+                bestDist, bestRim = d, rim
+            end
+        end
+    end
+
+    return bestRim, bestDist
+end
+
+        local function powerForDistance(d)
+            if d <= 16 then
+                return 30
+            elseif d <= 20 then
+                return 35
+            elseif d <= 26 then
+                return 40
+            elseif d <= 28 then
+                return 45
+            elseif d <= 36 then
+                return 50
+            elseif d <= 38 then
+                return 55
+            elseif d <= 42 then
+                return 60
+            elseif d <= 46 then
+                return 65
+            elseif d <= 56 then
+                return 70
+            elseif d <= 61 then
+                return 75
+            elseif d <= 65.2 then
+                return 80
+            elseif d <= 74 then
+                return 85
+            else
+                return 75
+            end
+        end
+
+        local function arcLow(d)
+            if d < 13 then
+                return 15
+            elseif d < 16 then
+                return 20
+            elseif d < 18 then
+                return 15
+            elseif d < 19 then
+                return 25
+            elseif d < 23 then
+                return 25
+            elseif d < 30 then
+                return 20
+            elseif d < 39 then
+                return 25
+            elseif d < 46 then
+                return 45
+            elseif d < 48 then
+                return 40
+            elseif d < 52 then
+                return 53
+            elseif d < 56 then
+                return 45
+            elseif d < 62 then
+                return 47
+            elseif d < 63 then
+                return 63
+            elseif d < 66 then
+                return 42
+            elseif d < 68.9 then
+                return 75
+            elseif d < 70 then
+                return 67
+            else
+                return 65
+            end
+        end
+
+        local function arcHigh(d)
+            if d < 13 then
+                return 165
+            elseif d < 16 then
+                return 160
+            elseif d < 18 then
+                return 155
+            elseif d < 19 then
+                return 180
+            elseif d < 23 then
+                return 115
+            elseif d < 30 then
+                return 108
+            elseif d < 39 then
+                return 105
+            elseif d < 46 then
+                return 102
+            elseif d < 48 then
+                return 97
+            elseif d < 52 then
+                return 97
+            elseif d < 56 then
+                return 91
+            elseif d < 58 then
+                return 89
+            elseif d < 62 then
+                return 85
+            elseif d < 63 then
+                return 85
+            elseif d < 65.2 then
+                return 80
+            elseif d < 68.9 then
+                return 75
+            elseif d < 70 then
+                return 72
+            else
+                return 65
+            end
+        end
+
+        local function hasBall()
+            local folder = workspace:FindFirstChild(plr.Name)
+            return folder and folder:FindFirstChild('Basketball')
+        end
+
+        local function getBall()
+            local folder = workspace:FindFirstChild(plr.Name)
+            if not folder then
+                return nil
+            end
+            return folder:FindFirstChild('Basketball')
+        end
+
+        local function getNearestPart(torso)
+            local dist, part = 9e9, nil
+            local plrCharacter = LocalPlayer.Character
+            for _, v in ipairs(plrCharacter:GetChildren()) do
+                if v:IsA('Part') then
+                    local mag = (v.Position - torso.Position).Magnitude
+                    if mag < dist then
+                        dist = mag
+                        part = v
+                    end
+                end
+            end
+            return part, dist
+        end
+
+        local function getCharacterData(player)
+            local ch = player.Character
+            if not ch then
+                return
+            end
+            local root = ch:FindFirstChild('HumanoidRootPart')
+            local humanoid = ch:FindFirstChildOfClass('Humanoid')
+            return root, humanoid
+        end
+
+        local mt = getrawmetatable(game)
+        setreadonly(mt, false)
+
+        local oldNamecall = mt.__namecall
+        mt.__namecall = function(self, ...)
+            local method = getnamecallmethod()
+            local args = { ... }
+
+            -- Block sbEvent:FireServer("Travel") silently
+            if AntiTravelEnabled and method == 'FireServer' then
+                if self.Name == 'sbEvent' and args[1] == 'Travel' then
+                    return nil -- silently block
+                end
+            end
+
+            return oldNamecall(self, ...)
+        end
+
+        local function fireDeviceEvent(arg)
+            local success, err = pcall(function()
+                local args = { arg }
+                game
+                    :GetService('ReplicatedStorage')
+                    :WaitForChild('Remotes')
+                    :WaitForChild('deviceEvent')
+                    :FireServer(unpack(args))
+            end)
+
+            if not success then
+                warn('Failed to send deviceEvent:', err)
+            end
+        end
+
+        local function findClosest()
+            local myRoot = plr.Character
+                and plr.Character:FindFirstChild('HumanoidRootPart')
+            if not myRoot then
+                return nil
+            end
+
+            -- Update function
+
+            local closest = nil
+            local bestDist = math.huge
+
+            for _, otherPlayer in pairs(Players:GetPlayers()) do
+                if otherPlayer ~= plr then
+                    local root = otherPlayer.Character
+                        and otherPlayer.Character:FindFirstChild(
+                            'HumanoidRootPart'
+                        )
+                    if root then
+                        local dist = (Vector2.new(
+                            root.Position.X,
+                            root.Position.Z
+                        ) - Vector2.new(
+                            myRoot.Position.X,
+                            myRoot.Position.Z
+                        )).Magnitude
+                        if dist < bestDist then
+                            bestDist = dist
+                            closest = otherPlayer
+                        end
+                    end
+                end
+            end
+            return closest
+        end
+
+        local function predictPosition(rootPart, dt)
+            return rootPart.Position + (rootPart.Velocity * dt)
+        end
+
+        local Players = game:GetService('Players')
+        local RunService = game:GetService('RunService')
+        local LocalPlayer = Players.LocalPlayer
+
+        local LocalPlayer = Players.LocalPlayer
+        local speedBypassEnabled = false
+        local speedGain = 0
+        local bodyVel = nil
+        local reachEnabled = false
+        local reachDistance = 0
+        local oobBackup = {}
+
+        local currentConnection -- to store the loop
+        local characterConnection
+
+        local function getHumanoid()
+            local char = LocalPlayer.Character
+            return char and char:FindFirstChildWhichIsA('Humanoid')
+        end
+
+        local function isPlayerMoving(humanoid)
+            return humanoid and humanoid.MoveDirection.Magnitude > 0
+        end
+
+        local jumpWaitTime = 0.2
+        local MaxMagnetDistance = 0
+        local ShotMagMaxDistance = 0
+
+local WaitSlider = AimbotSection:AddSlider("JumpWaitSlider", {
+    Text = 'Jump Wait Time',
+    Min = 0.05,
+    Max = 0.4,
+    Rounding = 3,
+    Default = jumpWaitTime,
+    Flag = 'JumpWaitSlider',
+    Callback = function(value)
+        jumpWaitTime = value
+    end,
+})
+
+        -- Add Magnet toggle
+local MagnetToggle = BallSection:AddToggle("Magnet", {
+    Text = 'Full Magnet Ball',
+    Flag = 'MagnetToggle',
+    Callback = function(state)
+        MagnetEnabled = state
+        SendNotification(
+            state and 'Full Magnet Enabled' or 'Full Magnet Disabled',
+            3,
+            state and Color3.fromRGB(0, 255, 0)
+                or Color3.fromRGB(255, 0, 0)
+        )
+    end,
+})
+
+-- Create dependency box
+local MagnetSettingsBox = BallSection:AddDependencyBox()
+
+-- Magnet Distance Slider (dependent)
+MagnetSettingsBox:AddSlider("FullMagnetSlider", {
+    Text = 'Full Magnet Max Distance',
+    Default = MaxMagnetDistance,
+    Min = 0,
+    Max = 50,
+    Rounding = 1,
+    Compact = false,
+    Callback = function(value)
+        MaxMagnetDistance = value
+    end,
+})
+
+-- Set up dependency on the toggle
+MagnetSettingsBox:SetupDependencies({
+    { Toggles.Magnet, true }
+})
+
+local ShotMagnetToggle = BallSection:AddToggle("ShotMagnetToggle", {
+    Text = 'Shot Magnet Ball',
+    Callback = function(state)
+        ShotMagnetEnabled = state
+        SendNotification(
+            state and 'Shot Magnet Enabled' or 'Shot Magnet Disabled',
+            3,
+            state and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+        )
+    end,
+})
+
+-- Create dependency box for slider
+local ShotMagSettingsBox = BallSection:AddDependencyBox()
+
+-- Slider (depends on toggle)
+ShotMagSettingsBox:AddSlider("ShotMagMaxDistance", {
+    Text = 'Shot Mag Max Distance',
+    Min = 0,
+    Max = 150,
+    Default = ShotMagMaxDistance,
+    Callback = function(value)
+        ShotMagMaxDistance = value
+    end,
+})
+
+-- Link slider visibility to toggle state
+ShotMagSettingsBox:SetupDependencies({
+    { Toggles.ShotMagnetToggle, true }
+})
+
+
+local ReachToggle = BallSection:AddToggle("ReachToggle", {
+    Text = 'Reach Enabled',
+    Callback = function(state)
+        reachEnabled = state
+        SendNotification(
+            state and 'Reach Enabled' or 'Reach Disabled',
+            3,
+            state and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+        )
+    end,
+})
+
+-- Dependency box for slider
+local ReachSettingsBox = BallSection:AddDependencyBox()
+
+-- Reach Distance Slider (only visible when toggle is on)
+ReachSettingsBox:AddSlider("ReachDistance", {
+    Text = 'Reach Distance',
+    Min = 0,
+    Max = 5,
+    Rounding = 1,
+    Value = reachDistance,
+    Textbox = true,
+    Callback = function(val)
+        reachDistance = val
+    end,
+})
+
+-- Toggle controls visibility
+ReachSettingsBox:SetupDependencies({
+    { Toggles.ReachToggle, true }
+})
+
+
+        local originalCanTouch = {}
+        local originalWallStates = {}
+
+local AntiOOBToggle = OOBSection:AddToggle("OOBTouchToggle", {
+    Text = 'Anti OOB',
+            Flag = 'OOBTouchToggle',
+            Callback = function(enabled)
+                local courts = workspace:FindFirstChild('Courts')
+                if not courts then
+                    return
+                end
+
+                if enabled then
+                    -- Disable touch on every BasePart under each court.OOB
+                    originalCanTouch = {}
+                    for _, court in ipairs(courts:GetChildren()) do
+                        local oobFolder = court:FindFirstChild('OOB')
+                        if oobFolder then
+                            for _, part in ipairs(oobFolder:GetDescendants()) do
+                                if part:IsA('BasePart') then
+                                    -- store original value
+                                    originalCanTouch[part] = part.CanTouch
+                                    -- disable touch
+                                    part.CanTouch = false
+                                end
+                            end
+                        end
+                    end
+                    SendNotification(
+                        'Anti OOB Enabled',
+                        3,
+                        Color3.fromRGB(0, 255, 0)
+                    )
+                else
+                    -- Restore original CanTouch values
+                    for part, oldValue in pairs(originalCanTouch) do
+                        if part and part.Parent then
+                            part.CanTouch = oldValue
+                        end
+                    end
+                    originalCanTouch = {}
+                    SendNotification(
+                        'Anti OOB Disabled',
+                        3,
+                        Color3.fromRGB(255, 0, 0)
+                    )
+                end
+            end,
+        })
+
+local RemoveOOBWallsToggle = OOBSection:AddToggle("OOBWallsToggle", {
+    Text = 'Remove OOB Walls',
+            Flag = 'OOBWallsToggle',
+            Callback = function(enabled)
+                local courts = workspace:FindFirstChild('Courts')
+                if not courts then
+                    return
+                end
+
+                if enabled then
+                    originalWallStates = {}
+                    for _, court in ipairs(courts:GetChildren()) do
+                        local wallsFolder = court:FindFirstChild('OOB')
+                            and court.OOB:FindFirstChild('Walls')
+                        if wallsFolder then
+                            for _, part in ipairs(wallsFolder:GetDescendants()) do
+                                if part:IsA('BasePart') then
+                                    -- save original transparency & collisions
+                                    originalWallStates[part] = {
+                                        CanCollide = part.CanCollide,
+                                    }
+                                    -- hide & disable collisions
+                                    part.Transparency = 1
+                                    part.CanCollide = false
+                                end
+                            end
+                        end
+                    end
+                    SendNotification(
+                        'Remove OOB Walls Enabled',
+                        3,
+                        Color3.fromRGB(0, 255, 0)
+                    )
+                else
+                    for part, props in pairs(originalWallStates) do
+                        if part and part.Parent then
+                            part.CanCollide = props.CanCollide
+                        end
+                    end
+                    originalWallStates = {}
+                    SendNotification(
+                        'Remove OOB Walls Disabled',
+                        3,
+                        Color3.fromRGB(255, 0, 0)
+                    )
+                end
+            end,
+        })
+
+local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+local DeviceChangerDropdown = MiscSection:AddDropdown("DeviceChangerDropdown", {
+    Values = { "Mobile", "Desktop" },
+    Default = isMobile and 1 or 2,
+    Text = "Device Changer",
+    Callback = function(selected)
+        fireDeviceEvent(selected)
+    end
+})
+
+local ControllerToggle = MiscSection:AddToggle("ControllerToggle", {
+    Text = "Controller",
+    Flag = "ControllerToggle",
+    Default = false,
+    Callback = function(state)
+        fireDeviceEvent(state and "Gamepad On" or "Gamepad Off")
+        if state then
+            SendNotification(
+                "Controller Enabled",
+                3,
+                Color3.fromRGB(0, 255, 0)
+            )
+        else
+            SendNotification(
+                "Controller Disabled",
+                3,
+                Color3.fromRGB(255, 0, 0)
+            )
+        end
+    end
+})
+
+local SpeedEnabledToggle = PlayerSection:AddToggle("SpeedBypassToggle", {
+    Text = "Speed Enabled",
+    Flag = 'SpeedBypassToggle',
+    Default = false,
+    Callback = function(state)
+        speedBypassEnabled = state
+        SendNotification(
+            state and 'Speed Enabled' or 'Speed Disabled',
+            3,
+            state and Color3.fromRGB(0, 255, 0)
+                or Color3.fromRGB(255, 0, 0)
+        )
+    end,
+})
+
+-- Create dependency box for the Speed slider
+local SpeedSettingsBox = PlayerSection:AddDependencyBox()
+
+-- Add the slider inside the dependency box
+SpeedSettingsBox:AddSlider("SpeedBypassSlider", {
+    Text = "Speed",
+    Default = 16,
+    Min = 16,
+    Max = 22,
+    Rounding = 1,
+    Flag = 'SpeedBypassSlider',
+    Callback = function(val)
+        speedGain = ((val - 16) / 6) * 6
+    end,
+})
+
+-- Make the Speed slider depend on Speed toggle
+SpeedSettingsBox:SetupDependencies({
+    { Toggles.SpeedBypassToggle, true }
+})
+
+local AntiTravelToggle = PlayerSection:AddToggle("AntiTravelToggle", {
+            Text = "Anti Travel",
+            Flag = 'AntiTravelToggle',
+            Callback = function(state)
+                AntiTravelEnabled = state
+
+                SendNotification(
+                    state and 'Anti Travel Enabled' or 'Anti Travel Disabled',
+                    3,
+                    state and Color3.fromRGB(0, 255, 0)
+                        or Color3.fromRGB(255, 0, 0)
+                )
+            end,
+        })
+
+        -- Toggle for randomizing wait
+        local randomizeWait = false
+local RandomizeWaitToggle = AimbotSection:AddToggle("RandomizeWaitToggle", {
+            Text = "Randomize Wait",
+            Flag = 'RandomizeWaitToggle',
+            Callback = function(state)
+                randomizeWait = state
+                notify(
+                    state and 'Random wait enabled' or 'Random wait disabled'
+                )
+            end,
+        })
+
+AimbotSection:AddDivider()
+
+local UserInputService = game:GetService("UserInputService")
+local xOffset = 0
+
+local MobileCameraXOffsetSlider = AimbotSection:AddSlider("MobileCameraXOffset", {
+    Text = "Mobile Camera X Offset",
+    Flag = "MobileCameraXOffset",
+    Default = 0,
+    Min = -100,
+    Max = 100,
+    Callback = function(val)
+        local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+        if not isMobile then
+            SendNotification("This slider can only be used on mobile devices.", 3)
+            xOffset = 0
+            return
+        end
+        xOffset = val
+    end,
+})
+
+AimbotSection:AddDivider()
+
+local validCourts = { "Court E", "Court F", "Court G", "Court H", "Court I", "Court K" }
+local player = game.Players.LocalPlayer
+local UserId = player.UserId
+local TeamSide
+
+local TeamCheckToggle = AimbotSection:AddToggle("TeamCheckToggle", {
+    Text = "Team Goal Check",
+    Default = false,
+    Callback = function(val)
+        TeamGoalCheckEnabled = val
+    end
+})
+
+
+
+        -- Main shot function
+local function onJump()
+    if not AimbotEnabled or not hasBall() then
+        return
+    end
+
+    local rimPart, dist = getNearestRim()
+    if not rimPart or dist > 72 then
+        return
+    end
+
+    local mode = AimbotMode
+    local clamped = math.clamp(math.floor(dist), 0, 100)
+
+
+    local waitTime = jumpWaitTime
+    if randomizeWait then
+        waitTime = math.random(15, 25) / 100 -- random wait between 0.15 and 0.25 seconds
+    end
+
+    local oldCF = cam.CFrame
+    task.wait(waitTime)
+
+            if mode == 'Low Arc' then
+        plr:SetAttribute('Power', powerForDistance(clamped))
+    elseif mode == 'High Arc' then
+        plr:SetAttribute('Power', 85)
+    end
+
+    local head = plr.Character and plr.Character:FindFirstChild('Head')
+    if not head then return end
+
+    plr.DevEnableMouseLock = false
+    local root = plr.Character:FindFirstChild('HumanoidRootPart')
+    local velOff = Vector3.zero
+
+if root and plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+    local targetVelocity = Vector3.new(root.Velocity.X, 0, root.Velocity.Z)
+    local playerRoot = plr.Character.HumanoidRootPart
+    local toRim = (rimPart.Position - playerRoot.Position).Unit
+    local moveDir = targetVelocity.Magnitude > 0 and targetVelocity.Unit or Vector3.zero
+
+    local dot = toRim:Dot(moveDir)
+
+    if dot > 0.5 then
+        -- Walking away from rim
+        velOff = targetVelocity * 0.2
+    elseif dot < -0.5 then
+        -- Walking toward rim
+        velOff = targetVelocity * -1.5
+    else
+        -- Sideways or unpredictable
+        velOff = targetVelocity * 0.1
+    end
+end
+    local arcVal = (mode == 'Low Arc' and arcLow(dist) or mode == 'High Arc' and arcHigh(dist) or arcLow(dist))
+    local targetPos = rimPart.Position
+    local aimPnt = targetPos + Vector3.new(0, arcVal, 0) + velOff
+
+    cam.CFrame = CFrame.new(head.Position, aimPnt)
+
+    task.wait(0.01)
+
+    local vs = cam.ViewportSize
+    local centerX = (vs.X / 2) + xOffset
+    local centerY = vs.Y / 2
+
+    -- Simulate mouse click at center of screen to shoot
+    VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, nil, 0)
+    VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, nil, 0)
+
+    task.wait(0.01)
+    cam.CFrame = oldCF
+    plr.DevEnableMouseLock = true
+end
+
+        -- Connect jump listener
+        if _G.aimbotConnection then
+            _G.aimbotConnection:Disconnect()
+        end
+        _G.aimbotConnection = plr.CharacterAdded:Connect(function(char)
+            char:WaitForChild('Humanoid').Jumping:Connect(onJump)
+        end)
+        if plr.Character then
+            _G.aimbotConnection = plr.Character
+                :WaitForChild('Humanoid').Jumping
+                :Connect(onJump)
+        end
+
+        -- Lock-on settings
+        local LockToPlayer = false
+        local LockedPlayer = nil
+        local MoveCooldown = 0.1
+        local lastMoveTick = 0
+        local PredictionOffset = 0.50
+        local lockConnection = nil
+        local lockDisabledFromBall = false
+
+local MobileLockToggle = OtherSection:AddToggle("MobileLockToggle", {
+            Text = "Mobile Lock UI",
+            Flag = 'MobileLockToggle',
+            Callback = function(state)
+                local isMobile = UserInputService.TouchEnabled
+                    and not UserInputService.KeyboardEnabled
+                local heartbeatConnection
+
+                if state then
+                    if not isMobile then
+                        SendNotification(
+                            'Only mobile can use this toggle.',
+                            3,
+                            Color3.fromRGB(255, 165, 0)
+                        )
+                        return
+                    end
+
+                    -- create UI
+                    mobileGui = Instance.new('ScreenGui')
+                    mobileGui.Name = 'MobileLockGui'
+                    mobileGui.ResetOnSpawn = false
+                    mobileGui.Parent = playerGui
+
+                    mobileBtn = Instance.new('TextButton')
+                    mobileBtn.Name = 'LockButton'
+                    mobileBtn.Size = UDim2.new(0, 100, 0, 40)
+                    mobileBtn.Position = UDim2.new(0.9, -50, 0.1, -20)
+                    mobileBtn.AnchorPoint = Vector2.new(0.5, 0.5)
+                    mobileBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+                    mobileBtn.BorderSizePixel = 0
+                    mobileBtn.AutoButtonColor = false
+                    mobileBtn.Text = 'Lock Button'
+                    mobileBtn.TextColor3 = Color3.new(1, 1, 1)
+                    mobileBtn.Font = Enum.Font.SourceSansBold
+                    mobileBtn.TextScaled = true
+                    mobileBtn.Parent = mobileGui
+
+                    local corner = Instance.new('UICorner')
+                    corner.CornerRadius = UDim.new(0, 20)
+                    corner.Parent = mobileBtn
+
+                    mobileBtn.Active = true
+                    mobileBtn.Draggable = true
+
+                    -- tap handler
+                    mobileBtn.MouseButton1Click:Connect(function()
+                        if hasBall() then
+                            SendNotification(
+                                'Cannot toggle Lock while you have the ball!',
+                                3,
+                                Color3.fromRGB(255, 165, 0)
+                            )
+                            return
+                        end
+
+                        LockToPlayer = not LockToPlayer
+                        if LockToPlayer then
+                            LockedPlayer = findClosest()
+                            if LockedPlayer then
+                                SendNotification(
+                                    'Lock Enabled on ' .. LockedPlayer.Name,
+                                    3,
+                                    Color3.fromRGB(0, 255, 0)
+                                )
+                                mobileBtn.BackgroundColor3 = Color3.fromRGB(
+                                    0,
+                                    255,
+                                    0
+                                )
+                            else
+                                LockToPlayer = false
+                                SendNotification(
+                                    'No players found to lock onto.',
+                                    3,
+                                    Color3.fromRGB(255, 165, 0)
+                                )
+                                mobileBtn.BackgroundColor3 = Color3.fromRGB(
+                                    255,
+                                    0,
+                                    0
+                                )
+                            end
+                        else
+                            LockedPlayer = nil
+                            SendNotification(
+                                'Lock Disabled',
+                                3,
+                                Color3.fromRGB(255, 0, 0)
+                            )
+                            mobileBtn.BackgroundColor3 = Color3.fromRGB(
+                                255,
+                                0,
+                                0
+                            )
+                        end
+                    end)
+
+                    -- monitor for ball
+                    heartbeatConnection = RunService.RenderStepped:Connect(
+                        function()
+                            if not mobileBtn or not mobileBtn.Parent then
+                                heartbeatConnection:Disconnect()
+                                return
+                            end
+
+                            if hasBall() then
+                                -- force disable + red
+                                LockToPlayer = false
+                                LockedPlayer = nil
+                                mobileBtn.BackgroundColor3 = Color3.fromRGB(
+                                    255,
+                                    0,
+                                    0
+                                )
+                                mobileBtn.Text = 'Locked (Ball)'
+                                mobileBtn.Active = false
+                            else
+                                -- restore interactivity
+                                mobileBtn.Text = 'Lock Button'
+                                mobileBtn.Active = true
+                                if LockToPlayer then
+                                    mobileBtn.BackgroundColor3 = Color3.fromRGB(
+                                        0,
+                                        255,
+                                        0
+                                    )
+                                else
+                                    mobileBtn.BackgroundColor3 = Color3.fromRGB(
+                                        255,
+                                        0,
+                                        0
+                                    )
+                                end
+                            end
+                        end
+                    )
+                else
+                    -- cleanup
+                    if heartbeatConnection then
+                        heartbeatConnection:Disconnect()
+                        heartbeatConnection = nil
+                    end
+                    if mobileGui then
+                        mobileGui:Destroy()
+                        mobileGui = nil
+                        mobileBtn = nil
+                    end
+                end
+            end,
+        })
+
+
+OtherSection:AddLabel("Lock Onto Player"):AddKeyPicker("LockOntoPlayerKeybind", {
+            Text = 'Lock Onto Player',
+            Default = "L",
+            Mode = "Toggle",
+
+            Callback = function(_)
+                if hasBall() then
+                    SendNotification(
+                        'Cannot toggle Lock while you have the ball!',
+                        3,
+                        Color3.fromRGB(255, 165, 0)
+                    )
+                    return
+                end
+
+                LockToPlayer = not LockToPlayer
+
+                if LockToPlayer then
+                    LockedPlayer = findClosest()
+                    if LockedPlayer then
+                        SendNotification(
+                            'Lock Enabled on ' .. LockedPlayer.Name,
+                            3,
+                            Color3.fromRGB(0, 255, 0)
+                        )
+                    else
+                        LockToPlayer = false
+                        SendNotification(
+                            'No players found to lock onto.',
+                            3,
+                            Color3.fromRGB(255, 165, 0)
+                        )
+                    end
+                else
+                    LockedPlayer = nil
+                    SendNotification(
+                        'Lock Disabled',
+                        3,
+                        Color3.fromRGB(255, 0, 0)
+                    )
+                end
+            end,
+        })
+
+
+
+local predictionSlider = OtherSection:AddSlider("PredictionSlider", {
+            Text = "Prediction Amount",
+            Default = 1,
+            Min = 0,
+            Max = 2,
+            Rounding = 2,
+            Flag = 'PredictionSlider',
+            Callback = function(value)
+                PredictionOffset = value
+            end,
+        })
+
+
+
+
+PassSection:AddLabel("Pass To Self"):AddKeyPicker("PassToSelfKeybind", {
+    Default = "O",
+    Mode = "Toggle",
+    SyncToggleState = false,
+    Text = "Pass to Self",
+
+    Callback = function(_)
+
+        if not hasBall() then
+            notify("You don't have the ball!")
+            return
+        end
+
+        local char = plr.Character
+        local head = char and char:FindFirstChild('Head')
+        if not head then return end
+
+        local root = char:FindFirstChild('HumanoidRootPart')
+        if not root then return end
+
+
+        plr:SetAttribute('Power', 85)
+
+
+        local direction = cam.CFrame.LookVector
+        local passDistance = 25
+        local arcHeight = 105
+
+        local targetPosition = head.Position
+            + (direction.Unit * passDistance)
+            + Vector3.new(0, arcHeight, 0)
+
+
+        local oldCF = cam.CFrame
+        cam.CFrame = CFrame.new(head.Position, targetPosition)
+
+        task.wait(0.01)
+
+
+        local vs = cam.ViewportSize
+        VirtualInputManager:SendMouseButtonEvent(
+            vs.X / 2,
+            vs.Y / 2,
+            0,
+            true,
+            nil,
+            0
+        )
+        VirtualInputManager:SendMouseButtonEvent(
+            vs.X / 2,
+            vs.Y / 2,
+            0,
+            false,
+            nil,
+            0
+        )
+
+        -- Reset camera
+        task.wait(0.01)
+        cam.CFrame = oldCF
+    end,
+
+    ChangedCallback = function(newKey)
+    end,
+})
+
+
+--// Mobile Self Pass Button
+PassSection:AddToggle("MobileSelfPassToggle", {
+    Text = "Mobile Self Pass UI",
+    Flag = "MobileSelfPassToggle",
+    Callback = function(state)
+        local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+        if not isMobile then
+            SendNotification("Only mobile can use this toggle.", 3, Color3.fromRGB(255, 165, 0))
+            return
+        end
+
+        if state then
+            -- Create GUI
+local mobileGui = Instance.new("ScreenGui")
+mobileGui.Name = "MobileSelfPassGui"
+mobileGui.ResetOnSpawn = false
+mobileGui.Parent = playerGui
+
+local selfPassBtn = Instance.new("TextButton")
+            selfPassBtn.Name = "SelfPassButton"
+            selfPassBtn.Size = UDim2.new(0, 100, 0, 40)
+            selfPassBtn.Position = UDim2.new(0.9, -50, 0.2, -20)
+            selfPassBtn.AnchorPoint = Vector2.new(0.5, 0.5)
+            selfPassBtn.BackgroundColor3 = Color3.fromRGB(30, 144, 255)
+            selfPassBtn.BorderSizePixel = 0
+            selfPassBtn.AutoButtonColor = false
+            selfPassBtn.Text = "Self Pass"
+            selfPassBtn.TextColor3 = Color3.new(1, 1, 1)
+            selfPassBtn.Font = Enum.Font.SourceSansBold
+            selfPassBtn.TextScaled = true
+            selfPassBtn.Parent = mobileGui
+
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0, 20)
+            corner.Parent = selfPassBtn
+
+            selfPassBtn.Active = true
+            selfPassBtn.Draggable = true
+
+            -- Self pass logic
+            selfPassBtn.MouseButton1Click:Connect(function()
+                if not hasBall() then
+                    notify("You don't have the ball!")
+                    return
+                end
+
+                local char = plr.Character
+                local head = char and char:FindFirstChild('Head')
+                if not head then return end
+
+                local root = char:FindFirstChild('HumanoidRootPart')
+                if not root then return end
+
+                plr:SetAttribute("Power", 85)
+
+                local direction = cam.CFrame.LookVector
+                local passDistance = 25
+                local arcHeight = 105
+
+                local targetPosition = head.Position
+                    + (direction.Unit * passDistance)
+                    + Vector3.new(0, arcHeight, 0)
+
+                local oldCF = cam.CFrame
+                cam.CFrame = CFrame.new(head.Position, targetPosition)
+
+                task.wait(0.01)
+
+local vs = cam.ViewportSize
+local centerX = (vs.X / 2) + xOffset
+local centerY = vs.Y / 2
+
+VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, nil, 0)
+VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, nil, 0)
+
+                task.wait(0.01)
+                cam.CFrame = oldCF
+            end)
+        else
+            local existingGui = playerGui:FindFirstChild("MobileSelfPassGui")
+            if existingGui then
+                existingGui:Destroy()
+            end
+        end
+    end,
+})
+
+local watermarkEnabled = false
+
+SettingsSection:AddToggle("WatermarkToggle", {
+    Text = "Show Watermark",
+    Default = watermarkEnabled,
+    Flag = "WatermarkToggle",
+    Callback = function(state)
+        watermarkEnabled = state
+        Library:SetWatermarkVisibility(state)
+    end,
+})
+
+
+SettingsSection:AddToggle("KeybindMenuOpen", {
+    Text = "Open Keybind Menu",
+    Default = Library.KeybindFrame.Visible,
+    Flag = "KeybindMenuOpen",
+    Callback = function(value)
+        Library.KeybindFrame.Visible = value
+    end,
+})
+
+-- Create dependency box
+local KeybindSettings = SettingsSection:AddDependencyBox()
+
+-- Put dependent toggle inside box
+KeybindSettings:AddToggle("KeybindToggleFrame", {
+    Text = "Show Toggle Frame in Keybind Menu",
+    Default = false,
+    Flag = "KeybindToggleFrame",
+    Callback = function(state)
+        Library.ShowToggleFrameInKeybinds = state
+    end,
+})
+
+KeybindSettings:SetupDependencies({
+    { Toggles.KeybindMenuOpen, true }
+})
+
+SettingsSection:AddDivider()
+
+SettingsSection:AddToggle("ShowCustomCursor", {
+	Text = "Custom Cursor",
+	Default = true,
+	Callback = function(Value)
+		Library.ShowCustomCursor = Value
+	end,
+})
+
+SettingsSection:AddDropdown("DPIDropdown", {
+	Values = { "50%", "75%", "100%", "125%", "150%", "175%", "200%" },
+	Default = "100%",
+
+	Text = "UI Scale",
+
+	Callback = function(Value)
+		Value = Value:gsub("%%", "")
+		local DPI = tonumber(Value)
+
+		Library:SetDPIScale(DPI)
+	end,
+})
+
+SettingsSection:AddDivider()
+
+SettingsSection:AddLabel("Menu bind")
+	:AddKeyPicker("MenuKeybind", { Default = "RightShift", NoUI = true, Text = "Menu keybind" })
+
+SettingsSection:AddButton("Unload", function()
+	Library:Unload()
+end)
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+
+SaveManager:IgnoreThemeSettings()
+
+
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+
+ThemeManager:SetDefaultTheme({
+    AccentColor = Color3.fromRGB(255, 22, 0),
+})
+
+SaveManager:BuildConfigSection(SettingsTab)
+
+
+ThemeManager:ApplyToTab(SettingsTab)
+
+SaveManager:LoadAutoloadConfig()
+
+-- Set initial values
+Library:SetWatermarkVisibility(watermarkEnabled)
+Library.ShowToggleFrameInKeybinds = Toggles.KeybindToggleFrame.Value
+
+local FrameTimer = tick()
+local FrameCounter = 0
+local FPS = 60
+
+local WatermarkConnection = game:GetService('RunService').RenderStepped:Connect(function()
+    if not watermarkEnabled then
+        return
+    end
+
+    FrameCounter += 1
+
+    if (tick() - FrameTimer) >= 1 then
+        FPS = FrameCounter
+        FrameTimer = tick()
+        FrameCounter = 0
+    end
+
+    local pingStat = game:GetService('Stats'):FindFirstChild("Network"):FindFirstChild("ServerStatsItem"):FindFirstChild("Data Ping")
+    local ping = pingStat and math.floor(pingStat:GetValue()) or "?"
+
+    Library:SetWatermark(string.format("ArurHub | %s FPS | %s ms", math.floor(FPS), ping))
+end)
+
+
+        -- Combined visuals and lock-on
+        local RunService = game:GetService('RunService')
+
+        local lastMoveTime = 0
+        local lastPredictedPos = nil
+        local moveInterval = 0.05 -- every 0.05s = 20 times/sec (tweak if needed)
+
+        local RunService = game:GetService('RunService')
+
+        local lastMoveTime = 0
+        local lastPredictedPos = nil
+        local moveInterval = 0.05 -- Update 20 times/sec
+
+        local RunService = game:GetService('RunService')
+
+        local lastMoveTime = 0
+        local lastPredictedPos = nil
+        local moveInterval = 0.05 -- ~20 updates per second
+
+        RunService.Heartbeat:Connect(function()
+            if not LockToPlayer then
+                return
+            end
+
+            if hasBall() then
+                if LockToPlayer then
+                    LockToPlayer = false
+                    LockedPlayer = nil
+                    SendNotification(
+                        'Lock disabled because you have the ball',
+                        3,
+                        Color3.fromRGB(255, 165, 0)
+                    )
+                end
+                return
+            end
+
+            local targetRoot = LockedPlayer
+                and LockedPlayer.Character
+                and LockedPlayer.Character:FindFirstChild('HumanoidRootPart')
+
+            local targetHum = LockedPlayer
+                and LockedPlayer.Character
+                and LockedPlayer.Character:FindFirstChildOfClass('Humanoid')
+
+            local myRoot, myHum = getCharacterData(plr)
+            if not (targetRoot and targetHum and myRoot and myHum) then
+                LockToPlayer = false
+                return
+            end
+
+            -- Throttle movement to reduce lag
+            if tick() - lastMoveTime >= moveInterval then
+                local predicted = predictPosition(targetRoot, PredictionOffset)
+
+                -- Always move if enough time has passed
+                myHum:MoveTo(predicted)
+                lastPredictedPos = predicted
+                lastMoveTime = tick()
+            end
+        end)
+
+        local Players = game:GetService('Players')
+        local LocalPlayer = Players.LocalPlayer
+
+        local playerRoot = nil
+
+        LocalPlayer.CharacterAdded:Connect(function(character)
+            playerRoot = character:WaitForChild('HumanoidRootPart')
+        end)
+
+        if
+            LocalPlayer.Character
+            and LocalPlayer.Character:FindFirstChild('HumanoidRootPart')
+        then
+            playerRoot = LocalPlayer.Character.HumanoidRootPart
+        end
+
+
+
+task.spawn(function()
+    while true do
+        if MagnetEnabled then
+            -- Update balls list inside all "Basketball" folders
+            balls = {}
+            for _, folder in ipairs(workspace:GetChildren()) do
+                if folder:IsA("Folder") and folder.Name == "Basketball" then
+                    for _, ball in ipairs(folder:GetChildren()) do
+                        if ball:IsA("BasePart") and ball.Name == "Ball" and ball:FindFirstChildWhichIsA("TouchTransmitter") then
+                            table.insert(balls, ball)
+                        end
+                    end
+                end
+            end
+
+            -- Find nearest ball and fire touch events
+            if playerRoot then
+                local nearestBall = nil
+                local nearestDist = math.huge
+                for _, ball in ipairs(balls) do
+                    local dist = (playerRoot.Position - ball.Position).Magnitude
+                    if dist <= MaxMagnetDistance and dist < nearestDist then
+                        nearestDist = dist
+                        nearestBall = ball
+                    end
+                end
+
+                if nearestBall then
+                    firetouchinterest(playerRoot, nearestBall, 0)
+                    firetouchinterest(playerRoot, nearestBall, 1)
+                end
+            end
+        end
+        task.wait(0.5) -- wait before repeating, adjust delay as needed
+    end
+end)
+
+
+
+        task.spawn(function()
+            while true do
+                if ShotMagnetEnabled and playerRoot then
+                    for _, playerModel in ipairs(workspace:GetChildren()) do
+                        if
+                            playerModel:IsA('Model')
+                            and playerModel.Name ~= LocalPlayer.Name
+                        then
+                            local basketballFolder = playerModel:FindFirstChild(
+                                'Basketball'
+                            )
+                            if
+                                basketballFolder
+                                and basketballFolder:IsA('Folder')
+                            then
+                                local ball = basketballFolder:FindFirstChild(
+                                    'Ball'
+                                )
+                                if
+                                    ball
+                                    and ball:IsA('BasePart')
+                                    and ball:FindFirstChildWhichIsA(
+                                        'TouchTransmitter'
+                                    )
+                                then
+                                    local dist = (
+                                        playerRoot.Position - ball.Position
+                                    ).Magnitude
+                                    if dist <= ShotMagMaxDistance then
+                                        firetouchinterest(playerRoot, ball, 0)
+                                        firetouchinterest(playerRoot, ball, 1)
+                                        task.wait(0.02)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+                task.wait(0.2)
+            end
+        end)
+
+        local playerWithBall = nil
+
+        local function updateNearestPlayerWithBall()
+            local dist = math.huge
+            playerWithBall = nil
+
+            local plrCharacter = LocalPlayer.Character
+            if not plrCharacter or not plrCharacter:FindFirstChild('Torso') then
+                return
+            end
+
+            local myTorso = plrCharacter.Torso
+            for _, v in pairs(Players:GetPlayers()) do
+                if
+                    v.Name ~= LocalPlayer.Name
+                    and v.Character
+                    and v.Character:FindFirstChild('Basketball')
+                    and not plrCharacter:FindFirstChild('Basketball')
+                then
+                    local otherTorso = v.Character:FindFirstChild('Torso')
+                    if otherTorso then
+                        local mag =
+                            (myTorso.Position - otherTorso.Position).Magnitude
+                        if mag < 50 and mag < dist then
+                            dist = mag
+                            playerWithBall = v
+                        end
+                    end
+                end
+            end
+        end
+
+        task.spawn(function()
+            while true do
+                if reachEnabled then
+                    updateNearestPlayerWithBall()
+                    local target = playerWithBall
+                    if target and target.Character then
+                        local torso = target.Character:FindFirstChild('Torso')
+                        if torso then
+                            local nearestPart, partDist = getNearestPart(torso)
+                            if nearestPart then
+                                if partDist <= reachDistance then
+                                    local ballModel =
+                                        target.Character:FindFirstChild(
+                                            'Basketball'
+                                        )
+                                    if ballModel then
+                                        local ballPart =
+                                            ballModel:FindFirstChildOfClass(
+                                                'Part'
+                                            )
+                                        if ballPart then
+                                            firetouchinterest(
+                                                nearestPart,
+                                                ballPart,
+                                                0
+                                            )
+                                            task.wait(0.05)
+                                            firetouchinterest(
+                                                nearestPart,
+                                                ballPart,
+                                                1
+                                            )
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+                task.wait(0.2)
+            end
+        end)
+
+        task.spawn(function()
+    while true do
+        task.wait(1)
+        local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if not root then continue end
+
+        for _, courtName in ipairs(validCourts) do
+            local court = workspace.Courts:FindFirstChild(courtName)
+            if court and court.PrimaryPart and (root.Position - court.PrimaryPart.Position).Magnitude < 20 then
+                task.wait(5) -- stood near court for 5 sec
+                if court._CourtSettings.Started.Value then
+                    local players = court._CourtPlayers
+                    if players.Home1.Value == player or players.Home2.Value == player then
+                        TeamSide = "Home"
+                    elseif players.Away1.Value == player or players.Away2.Value == player then
+                        TeamSide = "Away"
+                    else
+                        TeamSide = nil
+                    end
+                end
+            end
+        end
+    end
+end)
+
+        RunService.RenderStepped:Connect(function()
+            if not ShowRange or not hasBall() then
+                rangeLabel.Visible = false
+                highlight.Enabled = false
+                return
+            end
+
+            if OnlyShowWithAimbot and not AimbotEnabled then
+                rangeLabel.Visible = false
+                highlight.Enabled = false
+                return
+            end
+
+            local _, dist = getNearestRim()
+            local inRange = dist <= 72
+
+            if RangeMode == 'Outline' then
+                rangeLabel.Visible = false
+                highlight.Enabled = true
+                highlight.OutlineColor = inRange and Color3.new(0, 1, 0)
+                    or Color3.new(1, 0, 0)
+                highlight.FillColor = inRange and Color3.new(0, 1, 0)
+                    or Color3.new(1, 0, 0) -- red when out of range
+            else
+                highlight.Enabled = false
+                rangeLabel.Visible = true
+                rangeLabel.Text = inRange and 'In Range' or 'Out of Range'
+                rangeLabel.TextColor3 = inRange and Color3.new(0, 1, 0)
+                    or Color3.new(1, 0, 0)
+
+                if RangeMode == 'Top' then
+                    rangeLabel.AnchorPoint = Vector2.new(0.5, 0)
+                    rangeLabel.Position = UDim2.new(0.5, 0, 0.1, 0)
+                else
+                    rangeLabel.AnchorPoint = Vector2.new(0.5, 1)
+                    rangeLabel.Position = UDim2.new(0.5, 0, 0.9, 0)
+                end
+            end
+        end)
+
+        -- Toggle system
+        RunService.Heartbeat:Connect(function()
+            if not speedBypassEnabled then
+                return
+            end
+            if humanoid:GetState() == Enum.HumanoidStateType.Dead then
+                return
+            end
+
+            local moveDir = humanoid.MoveDirection
+            if moveDir.Magnitude > 0 then
+                local currentVel = rootPart.AssemblyLinearVelocity
+                local extra = moveDir.Unit * speedGain
+
+                if
+                    currentVel.Magnitude
+                    < humanoid.WalkSpeed + speedGain - 1
+                then
+                    rootPart.AssemblyLinearVelocity = Vector3.new(
+                        extra.X + currentVel.X,
+                        currentVel.Y,
+                        extra.Z + currentVel.Z
+                    )
+                end
+            end
+        end)
+
+        notify('Aimbot + Visuals Loaded!')
